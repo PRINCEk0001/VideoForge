@@ -327,11 +327,14 @@ export default function App() {
           </h1>
           <p>Create high-retention, professional videos in minutes. Let our 16-agent autonomous pipeline handle everything from script to final assembly.</p>
           
-          <div className="trust-bar">
-            <span className="trust-logo">YOUTUBE</span>
-            <span className="trust-logo">PRODUCT HUNT</span>
-            <span className="trust-logo">TIKTOK</span>
-            <span className="trust-logo">VIMEO</span>
+          <div style={{ marginTop: '48px' }}>
+            <span className="trust-label">TRUSTED BY CONTENT CREATORS ON</span>
+            <div className="trust-bar">
+              <span className="trust-logo">YOUTUBE</span>
+              <span className="trust-logo">PRODUCT HUNT</span>
+              <span className="trust-logo">TIKTOK</span>
+              <span className="trust-logo">VIMEO</span>
+            </div>
           </div>
         </section>
       )}

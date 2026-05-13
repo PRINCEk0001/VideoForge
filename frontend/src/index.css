@@ -197,6 +197,41 @@ body::before {
   margin: 0 auto;
 }
 
+/* ── Trust Bar ─────────────────────────────────────── */
+.trust-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 48px;
+  margin-top: 48px;
+  opacity: 0.6;
+  filter: grayscale(1);
+  transition: var(--transition);
+}
+
+.trust-bar:hover {
+  opacity: 0.9;
+  filter: grayscale(0.5);
+}
+
+.trust-logo {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--text-main);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.trust-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  margin-bottom: 16px;
+}
+
 /* ── Form & Cards ──────────────────────────────────── */
 .section-card {
   background: var(--bg-surface);
@@ -448,6 +483,23 @@ body::before {
   .sidebar { 
     display: none; 
   }
+  .trust-bar {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 32px;
+  }
+
+  .trust-logo {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+  }
+
+  .trust-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+  }
   .main-content { 
     padding: 20px; 
     margin-top: 80px;
@@ -460,27 +512,27 @@ body::before {
 
 @media (max-width: 768px) {
   :root {
-    --radius-xl: 20px;
-    --radius-lg: 16px;
-    --radius-md: 12px;
+    --radius-xl: 40px; /* More circular */
+    --radius-lg: 32px;
+    --radius-md: 24px;
   }
 
   .hero h1 {
     font-size: 32px;
     margin-bottom: 16px;
+    letter-spacing: -0.02em;
   }
 
   .hero p {
     font-size: 15px;
     padding: 0 10px;
+    opacity: 0.8;
   }
 
   .section-card {
     padding: 24px 16px;
-  }
-
-  .section-title {
-    margin-bottom: 24px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .section-title .serif {
@@ -500,66 +552,72 @@ body::before {
 
   .btn-generate {
     width: 100%;
-    padding: 14px 24px;
-    font-size: 15px;
+    padding: 18px 24px;
+    font-size: 16px;
+    border-radius: 100px; /* Perfectly circular ends */
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(0, 0, 0, 0.8));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Extra glow for the generate button on mobile */
+  .btn-generate::after {
+    width: 90%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #8B5CF6, #3B82F6, transparent);
+    filter: blur(2px);
   }
 
   .btn-group {
     flex-direction: column-reverse;
+    gap: 16px;
   }
 
   .btn-new {
     width: 100%;
-    padding: 12px;
+    padding: 14px;
+    border-radius: 100px;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .scene-chips {
-    gap: 8px;
+    gap: 10px;
   }
 
   .chip {
-    padding: 8px 16px;
+    padding: 12px 16px;
     font-size: 13px;
-    flex: 1 1 calc(50% - 8px);
+    border-radius: 100px; /* Pill shape */
+    flex: 1 1 calc(50% - 10px);
     text-align: center;
+    background: rgba(255, 255, 255, 0.03);
   }
 
-  .project-grid {
-    grid-template-columns: 1fr;
+  .chip.active {
+    background: #FFFFFF;
+    color: #000000;
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
   }
 
   .modal-content {
-    padding: 24px 16px;
+    padding: 32px 20px;
     margin: 10px;
-    max-height: 90vh;
-    overflow-y: auto;
+    border-radius: var(--radius-xl);
   }
 
-  .settings-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .trust-bar {
-    display: none; /* Hide trust logos on small mobile to save space */
-  }
-
-  .nav-link-btn {
-    display: none; /* Hide secondary nav links on mobile */
-  }
-  
-  .nav-global {
-    justify-content: center;
-  }
-
-  /* Success stats area */
   .video-meta {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   .meta-pill {
     width: 100%;
     justify-content: center;
+    padding: 10px;
+    border-radius: 100px;
   }
 }
 
