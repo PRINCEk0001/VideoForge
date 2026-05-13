@@ -479,7 +479,7 @@ body::before {
 
 /* ── Responsive Refinements ────────────────────────── */
 /* ── Premium Mobile Responsiveness ─────────────────── */
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
   .sidebar { 
     display: none; 
   }
