@@ -4,8 +4,11 @@ Endpoints:
   GET /api/run            — SSE stream, runs the full pipeline in background
   GET /api/health         — Health check
   GET /api/download_video — Download the single final_video.mp4
+  GET /api/projects       — List all saved projects
+  GET /api/analytics      — Get aggregate stats
 """
 import os
+import json
 import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -229,3 +232,69 @@ async def download_video():
         filename="final_video.mp4",
         headers={"Content-Disposition": "attachment; filename=final_video.mp4"},
     )
+
+@app.get("/api/projects")
+async def list_projects():
+    """List all projects in the output directory."""
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        return []
+    
+    projects = []
+    for f in os.listdir(output_dir):
+        if f.endswith(".json"):
+            try:
+                with open(os.path.join(output_dir, f), "r", encoding="utf-8") as meta_f:
+                    projects.append(json.load(meta_f))
+            except:
+                pass
+    
+    # Sort by date descending
+    projects.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return projects
+
+@app.get("/api/projects/{project_id}/video")
+async def get_project_video(project_id: str):
+    """Serve a specific project video."""
+    video_path = f"output/project_{project_id}.mp4"
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Project video not found.")
+    
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        filename=f"video_{project_id}.mp4"
+    )
+
+@app.get("/api/analytics")
+async def get_analytics():
+    """Calculate aggregate stats from all projects."""
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0}
+    
+    projects = []
+    for f in os.listdir(output_dir):
+        if f.endswith(".json"):
+            try:
+                with open(os.path.join(output_dir, f), "r", encoding="utf-8") as meta_f:
+                    projects.append(json.load(meta_f))
+            except: pass
+            
+    if not projects:
+        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0}
+    
+    total_videos = len(projects)
+    total_seo = sum(p.get("seo_score", 0) for p in projects)
+    total_dur_secs = sum(p.get("duration", 0) for p in projects)
+    
+    # Simulated retention based on SEO score and duration
+    avg_retention = sum(min(95, p.get("seo_score", 80) - 5) for p in projects) / total_videos
+
+    return {
+        "total_videos": total_videos,
+        "avg_retention": f"{int(avg_retention)}%",
+        "avg_seo": int(total_seo / total_videos),
+        "total_duration_mins": round(total_dur_secs / 60, 1),
+        "history": [p.get("seo_score", 85) for p in projects[:7]][::-1] # Last 7 projects
+    }

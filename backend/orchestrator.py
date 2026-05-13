@@ -4,6 +4,7 @@ Orchestrator — chains all 10 agents sequentially and streams SSE events.
 import json
 import time
 import os
+import shutil
 from typing import AsyncGenerator
 
 from backend.agents.trend_agent import TrendAgent
@@ -143,18 +144,53 @@ async def run_pipeline(topic_hint: str = "", target_scene_count: int = 5,
             }
             return
 
+    # PERSISTENCE: Save to output directory
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    project_id = pipeline_json.get("run_id", str(int(time.time())))
+    
+    final_video_src = pipeline_json.get("video_path")
+    if final_video_src and os.path.exists(final_video_src):
+        final_video_dst = os.path.join(output_dir, f"project_{project_id}.mp4")
+        try:
+            shutil.copy2(final_video_src, final_video_dst)
+        except Exception as e:
+            print(f"[Orchestrator] Failed to save video to output: {e}")
+
+    # Save Metadata
+    metadata = {
+        "id": project_id,
+        "topic": pipeline_json.get("topic_hint") or pipeline_json.get("topic", "Untitled Video"),
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "scene_count": len(pipeline_json.get("scenes", [])),
+        "duration": pipeline_json.get("actual_duration", 0),
+        "seo_score": pipeline_json.get("seo", {}).get("score", 85) if isinstance(pipeline_json.get("seo"), dict) else 85,
+        "video_format": pipeline_json.get("video_format"),
+        "video_style": pipeline_json.get("video_style")
+    }
+    
+    metadata_path = os.path.join(output_dir, f"project_{project_id}.json")
+    try:
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=4)
+    except Exception as e:
+        print(f"[Orchestrator] Failed to save metadata: {e}")
+
     # FINAL SUCCESS OUTPUT
     yield {
         "event": "pipeline_complete",
         "data": json.dumps({
             "status": "SUCCESS", 
             "video_path": pipeline_json.get("video_path"),
+            "project_id": project_id,
             "scene_count": len(pipeline_json.get("scenes", [])),
             "audio_synced": True,
             "subtitles_valid": True,
             "media_quality": pipeline_json.get("quality_scores", {}).get("media_score", "high"),
             "quality_scores": pipeline_json.get("quality_scores", {}),
             "learning_saved": pipeline_json.get("learning_saved", False),
-            "seo": pipeline_json.get("seo")
+            "seo": pipeline_json.get("seo"),
+            "title": metadata["topic"],
+            "estimated_duration_seconds": metadata["duration"]
         }),
     }

@@ -109,15 +109,37 @@ export default function App() {
     unreal_speech_api: "",
   });
   const [verifyStatus, setVerifyStatus] = useState({}); // { [key]: 'pending' | 'verifying' | 'success' | 'failed' }
+  const [projects, setProjects] = useState([]);
+  const [stats, setStats] = useState({ total_videos: 0, avg_retention: "0%", avg_seo: 0, total_duration_mins: 0, history: [] });
+  const [isLoading, setIsLoading] = useState(false);
   const esRef = useRef(null);
 
   // Load masked keys on mount
-  useState(() => {
+  useEffect(() => {
     fetch("/api/config/keys")
       .then(r => r.json())
       .then(data => setUserKeys(prev => ({ ...prev, ...data })))
       .catch(err => console.error("Failed to load keys:", err));
   }, []);
+
+  // Fetch projects when view changes
+  useEffect(() => {
+    if (activeView === "videos") {
+      setIsLoading(true);
+      fetch("/api/projects")
+        .then(r => r.json())
+        .then(data => {
+          setProjects(data);
+          setIsLoading(false);
+        })
+        .catch(err => setIsLoading(false));
+    } else if (activeView === "analytics") {
+      fetch("/api/analytics")
+        .then(r => r.json())
+        .then(data => setStats(data))
+        .catch(err => console.error(err));
+    }
+  }, [activeView]);
 
   const completedCount = steps.filter(s => s.status === "done").length;
   const progress = Math.round((completedCount / STEPS.length) * 100);
@@ -215,10 +237,10 @@ export default function App() {
   };
 
   /* ── Download video ──────────────────────────────────────── */
-  const handleDownload = () => {
+  const handleDownload = (projectId = null) => {
     const a = document.createElement("a");
-    a.href = "/api/download_video";
-    a.download = "my_video.mp4";
+    a.href = projectId ? `/api/projects/${projectId}/video` : "/api/download_video";
+    a.download = projectId ? `video_${projectId}.mp4` : "my_video.mp4";
     a.click();
   };
 
@@ -364,21 +386,25 @@ export default function App() {
                 </div>
               )}
 
-              <div style={{ marginTop: '8px' }}>
+              <div style={{ marginTop: '16px' }}>
                 <div className="field-label">Target Duration: <span className="serif" style={{ fontSize: '18px', textTransform: 'none', color: 'var(--text-main)' }}>{targetDuration === 0 ? "Auto" : `${targetDuration} min`}</span></div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="11" 
-                  step="1" 
-                  value={targetDuration} 
-                  onChange={e => setTargetDuration(parseInt(e.target.value))} 
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  <span>Auto</span>
-                  <span>1m</span>
-                  <span>5m</span>
-                  <span>11m</span>
+                
+                <div className="range-container">
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="11" 
+                    step="1" 
+                    className="custom-range"
+                    value={targetDuration} 
+                    onChange={e => setTargetDuration(parseInt(e.target.value))} 
+                  />
+                  <div className="range-labels">
+                    <span onClick={() => setTargetDuration(0)} className={targetDuration === 0 ? 'active' : ''}>Auto</span>
+                    <span onClick={() => setTargetDuration(1)} className={targetDuration === 1 ? 'active' : ''}>1m</span>
+                    <span onClick={() => setTargetDuration(5)} className={targetDuration === 5 ? 'active' : ''}>5m</span>
+                    <span onClick={() => setTargetDuration(11)} className={targetDuration === 11 ? 'active' : ''}>11m</span>
+                  </div>
                 </div>
               </div>
 
@@ -579,44 +605,29 @@ export default function App() {
           </div>
           
           <div className="project-grid">
-            {[
-              { id: 1, title: "Passive Income Tips", date: "2 mins ago", scenes: 12, seo: 92 },
-              { id: 2, title: "Mars Exploration", date: "1 hour ago", scenes: 8, seo: 88 },
-              { id: 3, title: "Healthy Meal Prep", date: "Yesterday", scenes: 15, seo: 95 }
-            ].map(proj => (
-              <div key={proj.id} className="project-card">
-                <div className="project-thumb">
-                  <div className="thumb-overlay">
-                    <button className="btn-play">▶</button>
+            {isLoading ? (
+              <div style={{ color: 'var(--text-dim)', padding: '40px' }}>Loading your masterpieces...</div>
+            ) : projects.length > 0 ? (
+              projects.map(proj => (
+                <div key={proj.id} className="project-card">
+                  <div className="project-thumb" style={{ background: 'var(--grad-main)', opacity: 0.8 }}>
+                    <div className="thumb-overlay">
+                      <button className="btn-play" onClick={() => handleDownload(proj.id)}>⬇️</button>
+                    </div>
+                  </div>
+                  <div className="project-info">
+                    <div className="project-title">{proj.topic}</div>
+                    <div className="project-meta">
+                      <span>{proj.scene_count} scenes</span> • <span>SEO {proj.seo_score}</span>
+                    </div>
+                    <div className="project-date">{proj.created_at}</div>
                   </div>
                 </div>
-                <div className="project-info">
-                  <div className="project-title">{proj.title}</div>
-                  <div className="project-meta">
-                    <span>{proj.scenes} scenes</span> • <span>SEO {proj.seo}</span>
-                  </div>
-                  <div className="project-date">{proj.date}</div>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div style={{ color: 'var(--text-dim)', padding: '40px' }}>No videos generated yet. Start one in the Generator!</div>
+            )}
           </div>
-          
-          {state === "done" && finalData && (
-            <div className="project-card" style={{ border: '1px solid var(--accent-light)' }}>
-              <div className="project-thumb" style={{ background: 'var(--grad-cool)' }}>
-                <div className="thumb-overlay">
-                  <button className="btn-play" onClick={handleDownload}>⬇️</button>
-                </div>
-              </div>
-              <div className="project-info">
-                <div className="project-title">{finalData.title || "Last Generated Video"}</div>
-                <div className="project-meta">
-                  <span>{finalData.scene_count} scenes</span> • <span>SEO {finalData.seo_score}</span>
-                </div>
-                <div className="project-date">Just now</div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -631,24 +642,26 @@ export default function App() {
           <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
             <div className="section-card" style={{ textAlign: 'center' }}>
               <div className="field-label">Total Videos</div>
-              <div className="success-title" style={{ fontSize: '3rem' }}>24</div>
+              <div className="success-title" style={{ fontSize: '3rem' }}>{stats.total_videos}</div>
             </div>
             <div className="section-card" style={{ textAlign: 'center' }}>
               <div className="field-label">Avg. Retention</div>
-              <div className="success-title" style={{ fontSize: '3rem', color: 'var(--accent-glow)' }}>82%</div>
+              <div className="success-title" style={{ fontSize: '3rem', color: 'var(--accent-glow)' }}>{stats.avg_retention}</div>
             </div>
             <div className="section-card" style={{ textAlign: 'center' }}>
-              <div className="field-label">SEO Score</div>
-              <div className="success-title" style={{ fontSize: '3rem', color: 'var(--accent-cool)' }}>91</div>
+              <div className="field-label">SEO Performance</div>
+              <div className="success-title" style={{ fontSize: '3rem', color: 'var(--accent-cool)' }}>{stats.avg_seo}</div>
             </div>
           </div>
           
           <div className="section-card" style={{ marginTop: '20px' }}>
-            <div className="section-title">📈 Growth Trend</div>
+            <div className="section-title">📈 SEO Trend (Last 7 Videos)</div>
             <div style={{ height: '200px', width: '100%', background: 'var(--bg-glass)', borderRadius: '12px', display: 'flex', alignItems: 'flex-end', gap: '8px', padding: '20px' }}>
-              {[40, 60, 45, 70, 90, 80, 100].map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'var(--grad-main)', borderRadius: '4px 4px 0 0', opacity: 0.7 }} />
-              ))}
+              {stats.history.length > 0 ? stats.history.map((h, i) => (
+                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'var(--grad-main)', borderRadius: '4px 4px 0 0', opacity: 0.7, transition: 'height 1s ease' }} />
+              )) : (
+                <div style={{ color: 'var(--text-dim)', margin: 'auto' }}>No data available yet.</div>
+              )}
             </div>
           </div>
         </div>
