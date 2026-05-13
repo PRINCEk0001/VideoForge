@@ -10,12 +10,13 @@ RUN npm run build
 FROM python:3.11-slim
 
 # Install system dependencies (FFmpeg is required for video assembly)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
+    libgl1 \
+    libglib2.0-0 \
     libsndfile1 \
-    libgl1-mesa-glx \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
