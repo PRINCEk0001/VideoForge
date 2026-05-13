@@ -1,6 +1,12 @@
-# Production Dockerfile for VideoForge AI
-# This handles FFmpeg installation and the Python multi-agent backend.
+# --- Stage 1: Build Frontend ---
+FROM node:20-slim AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
+# --- Stage 2: Production Environment ---
 FROM python:3.11-slim
 
 # Install system dependencies (FFmpeg is required for video assembly)
@@ -17,14 +23,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy backend and built frontend
 COPY . .
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 # Create necessary directories for storage
 RUN mkdir -p downloads/scenes downloads/audio downloads/synced output
 
-# Expose the backend port
+# Expose the port
 EXPOSE 8001
 
-# Command to run the backend
+# Command to run the backend (which now also serves the frontend)
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001"]

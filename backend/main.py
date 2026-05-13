@@ -13,6 +13,7 @@ import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 from backend.orchestrator import run_pipeline
@@ -21,12 +22,12 @@ from backend.utils.config_manager import ConfigManager
 # Ensure local model cache
 os.environ["HF_HOME"] = os.path.abspath("./downloads/models/hf_cache")
 
-app = FastAPI(title="VideoForge AI", version="2.0.0")
+app = FastAPI(title="VideoForge AI", version="2.0.1")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origins=["*"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -298,3 +299,42 @@ async def get_analytics():
         "total_duration_mins": round(total_dur_secs / 60, 1),
         "history": [p.get("seo_score", 85) for p in projects[:7]][::-1] # Last 7 projects
     }
+
+@app.get("/api/debug/paths")
+async def debug_paths():
+    """Diagnostic endpoint to check filesystem on Render."""
+    try:
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
+        frontend_path = os.path.join(base, "frontend")
+        dist_path = os.path.join(frontend_path, "dist")
+        
+        return {
+            "cwd": os.getcwd(),
+            "base_dir": base,
+            "base_exists": os.path.exists(base),
+            "frontend_exists": os.path.exists(frontend_path),
+            "dist_exists": os.path.exists(dist_path),
+            "dist_contents": os.listdir(dist_path) if os.path.exists(dist_path) else [],
+            "frontend_contents": os.listdir(frontend_path) if os.path.exists(frontend_path) else []
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── Serve Frontend ────────────────────────────────────────────────────────────
+# Use absolute path relative to this file for reliability in Docker
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend/dist")
+
+@app.get("/")
+async def serve_index():
+    """Serve the React app's index.html."""
+    index_path = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"detail": f"Frontend index.html not found at {index_path}. Check if build succeeded."}
+
+# Mount other static assets (CSS, JS, images)
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST), name="frontend")
+else:
+    print(f"[Warning] Frontend dist directory not found at {FRONTEND_DIST}")
