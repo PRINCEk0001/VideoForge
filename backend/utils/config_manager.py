@@ -59,14 +59,27 @@ class ConfigManager:
 
     @staticmethod
     def get_masked_keys() -> dict:
-        """Return keys masked for UI display."""
+        """Return keys masked for UI display, checking both storage and env vars."""
         keys = ConfigManager.load_api_keys()
+        
+        # List of keys we care about
+        key_map = {
+            "gemini_api": "GEMINI_API_KEY",
+            "groq_api": "GROQ_API_KEY",
+            "pexels_api": "PEXELS_API_KEY",
+            "pixabay_api": "PIXABAY_API_KEY",
+            "elevenlabs_api": "ELEVENLABS_API_KEY",
+            "unreal_speech_api": "UNREAL_SPEECH_API_KEY"
+        }
+        
         masked = {}
-        for k, v in keys.items():
-            if v:
-                masked[k] = f"{v[:4]}...{v[-4:]}" if len(v) > 8 else "***"
+        for ui_key, env_var in key_map.items():
+            val = keys.get(ui_key) or os.getenv(env_var, "")
+            if val:
+                # Mask it: show first 4 and last 4
+                masked[ui_key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "****"
             else:
-                masked[k] = ""
+                masked[ui_key] = ""
         return masked
 
     # --- User Preferences (Plaintext JSON) ---

@@ -43,7 +43,8 @@ async def run_pipeline(topic_hint: str = "", target_scene_count: int = 5,
                        voice_gender: str = "female", 
                        voice_style: str = "normal", voice_speed: float = 1.05, 
                        user_script: str = "", media_balance: float = 0.5,
-                       video_style: str = "realistic") -> AsyncGenerator[dict, None]:
+                       video_style: str = "realistic",
+                       request_keys: dict = None) -> AsyncGenerator[dict, None]:
     """Async generator that drives the pipeline and yields SSE dicts."""
     
     # If duration is provided, it overrides scene count
@@ -70,7 +71,8 @@ async def run_pipeline(topic_hint: str = "", target_scene_count: int = 5,
             "type": voice_gender,
             "style": voice_style,
             "speed": voice_speed
-        }
+        },
+        "api_keys": request_keys or {}
     }
 
     i = 0
@@ -78,7 +80,7 @@ async def run_pipeline(topic_hint: str = "", target_scene_count: int = 5,
     MAX_GLOBAL_RETRIES = 1
     while i < len(AGENT_CLASSES):
         AgentClass = AGENT_CLASSES[i]
-        agent = AgentClass()
+        agent = AgentClass(pipeline_json.get("api_keys", {}))
 
         # Signal phase started
         yield {

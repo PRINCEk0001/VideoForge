@@ -6,30 +6,30 @@
   --text-main: #FFFFFF;
   --text-dim: rgba(255, 255, 255, 0.6);
   --text-muted: rgba(255, 255, 255, 0.4);
-  
+
   --accent-purple: #8B5CF6;
   --accent-blue: #3B82F6;
   --accent-pink: #D946EF;
-  
+
   --bg-surface: rgba(255, 255, 255, 0.03);
   --border-light: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(255, 255, 255, 0.15);
-  
+
   --radius-xl: 32px;
   --radius-lg: 24px;
   --radius-md: 16px;
-  
+
   --blur-md: blur(12px);
   --blur-lg: blur(40px);
-  
+
   --transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Base Styles ───────────────────────────────────── */
-* { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -53,7 +53,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: 
+  background:
     radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
     radial-gradient(circle at 85% 85%, rgba(217, 70, 239, 0.08) 0%, transparent 40%),
     radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 60%);
@@ -171,8 +171,15 @@ body::before {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Hero Section ──────────────────────────────────── */
@@ -313,8 +320,10 @@ body::before {
 .btn-generate::after {
   content: '';
   position: absolute;
-  bottom: 0; left: 50%;
-  width: 80%; height: 2px;
+  bottom: 0;
+  left: 50%;
+  width: 80%;
+  height: 2px;
   background: linear-gradient(90deg, transparent, var(--accent-blue), var(--accent-purple), transparent);
   transform: translateX(-50%);
   filter: blur(1px);
@@ -415,8 +424,14 @@ body::before {
   font-weight: 500;
 }
 
-.step-row.done .step-name { color: var(--text-main); }
-.step-row.running .step-name { color: var(--text-main); font-weight: 700; }
+.step-row.done .step-name {
+  color: var(--text-main);
+}
+
+.step-row.running .step-name {
+  color: var(--text-main);
+  font-weight: 700;
+}
 
 /* ── Library & Analytics ───────────────────────────── */
 .project-grid {
@@ -474,15 +489,16 @@ body::before {
   padding: 48px;
   width: 100%;
   max-width: 600px;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
 }
 
 /* ── Responsive Refinements ────────────────────────── */
 /* ── Premium Mobile Responsiveness ─────────────────── */
-@media (max-width: 1150px) {
-  .sidebar { 
-    display: none; 
+@media (max-width: 1024px) {
+  .sidebar {
+    display: none;
   }
+
   .trust-bar {
     display: flex;
     gap: 20px;
@@ -500,11 +516,13 @@ body::before {
     font-size: 9px;
     letter-spacing: 0.2em;
   }
-  .main-content { 
-    padding: 20px; 
+
+  .main-content {
+    padding: 20px;
     margin-top: 80px;
     width: 100%;
   }
+
   .nav-global {
     padding: 0 20px;
   }
@@ -512,7 +530,8 @@ body::before {
 
 @media (max-width: 768px) {
   :root {
-    --radius-xl: 40px; /* More circular */
+    --radius-xl: 40px;
+    /* More circular */
     --radius-lg: 32px;
     --radius-md: 24px;
   }
@@ -545,7 +564,7 @@ body::before {
   }
 
   /* Stack columns in step 2 */
-  .section-card > div[style*="grid-template-columns"] {
+  .section-card>div[style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
     gap: 24px !important;
   }
@@ -554,7 +573,8 @@ body::before {
     width: 100%;
     padding: 18px 24px;
     font-size: 16px;
-    border-radius: 100px; /* Perfectly circular ends */
+    border-radius: 100px;
+    /* Perfectly circular ends */
     background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(0, 0, 0, 0.8));
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15);
@@ -590,7 +610,8 @@ body::before {
   .chip {
     padding: 12px 16px;
     font-size: 13px;
-    border-radius: 100px; /* Pill shape */
+    border-radius: 100px;
+    /* Pill shape */
     flex: 1 1 calc(50% - 10px);
     text-align: center;
     background: rgba(255, 255, 255, 0.03);
@@ -626,7 +647,7 @@ body::before {
   .chip {
     flex: 1 1 100%;
   }
-  
+
   .hero h1 {
     font-size: 28px;
   }
@@ -692,7 +713,20 @@ body::before {
 }
 
 /* Precise positioning based on 0-11 range */
-.range-labels span:nth-child(1) { left: 0%; transform: none; }
-.range-labels span:nth-child(2) { left: 9.09%; }
-.range-labels span:nth-child(3) { left: 45.45%; }
-.range-labels span:nth-child(4) { left: 100%; transform: translateX(-100%); }
+.range-labels span:nth-child(1) {
+  left: 0%;
+  transform: none;
+}
+
+.range-labels span:nth-child(2) {
+  left: 9.09%;
+}
+
+.range-labels span:nth-child(3) {
+  left: 45.45%;
+}
+
+.range-labels span:nth-child(4) {
+  left: 100%;
+  transform: translateX(-100%);
+}

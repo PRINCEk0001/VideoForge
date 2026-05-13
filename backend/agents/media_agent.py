@@ -50,143 +50,12 @@ def _generate_pollinations_image(query: str, video_format: str = "16:9", style: 
     }
 
 
-async def _fetch_pexels_photo(query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
-    PEXELS_KEY = ConfigManager.get_api_key("pexels_api") or os.getenv("PEXELS_API_KEY", "")
-    if not PEXELS_KEY:
-        return None
-    try:
-        orientation = "portrait" if video_format == "9:16" else "landscape"
-        r = await client.get(
-            PEXELS_PHOTO_URL,
-            headers={"Authorization": PEXELS_KEY},
-            params={"query": query, "per_page": 1, "orientation": orientation},
-            timeout=10,
-        )
-        data = r.json()
-        photos = data.get("photos", [])
-        if photos:
-            p = photos[0]
-            return {
-                "url": p["src"]["large2x"],
-                "thumbnail": p["src"]["medium"],
-                "type": "image",
-                "width": p["width"],
-                "height": p["height"],
-                "license": "Pexels Free License",
-                "attribution": f"Photo by {p['photographer']} on Pexels",
-                "source": "pexels",
-            }
-    except Exception:
-        pass
-    return None
 
 
-async def _fetch_pexels_video(query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
-    PEXELS_KEY = ConfigManager.get_api_key("pexels_api") or os.getenv("PEXELS_API_KEY", "")
-    if not PEXELS_KEY:
-        return None
-    try:
-        orientation = "portrait" if video_format == "9:16" else "landscape"
-        r = await client.get(
-            PEXELS_VIDEO_URL,
-            headers={"Authorization": PEXELS_KEY},
-            params={"query": query, "per_page": 3, "orientation": orientation, "size": "large"},
-            timeout=10,
-        )
-        data = r.json()
-        videos = data.get("videos", [])
-        if videos:
-            v = videos[0]
-            # Prefer 1080p (1920 width) to avoid massive 4K downloads that slow down the pipeline
-            files = v.get("video_files", [])
-            # Filter for files that are not larger than 1920 width
-            efficient_files = [f for f in files if f.get("width", 0) <= 1920]
-            # Sort by width descending within that limit, or fallback to any if none found
-            best = sorted(efficient_files or files, key=lambda x: x.get("width", 0), reverse=True)[0]
-            
-            return {
-                "url": best.get("link", ""),
-                "thumbnail": v.get("image", ""),
-                "type": "video",
-                "width": best.get("width", 0),
-                "height": best.get("height", 0),
-                "duration_seconds": v.get("duration", 0),
-                "license": "Pexels Free License",
-                "attribution": f"Video by {v['user']['name']} on Pexels",
-                "source": "pexels",
-            }
-    except Exception:
-        pass
-    return None
 
 
-async def _fetch_pixabay_photo(query: str, client: httpx.AsyncClient) -> dict | None:
-    PIXABAY_KEY = ConfigManager.get_api_key("pixabay_api") or os.getenv("PIXABAY_API_KEY", "")
-    if not PIXABAY_KEY:
-        return None
-    try:
-        r = await client.get(
-            PIXABAY_URL,
-            params={
-                "key": PIXABAY_KEY,
-                "q": query,
-                "image_type": "photo",
-                "per_page": 3,
-                "safesearch": "true",
-            },
-            timeout=10,
-        )
-        hits = r.json().get("hits", [])
-        if hits:
-            h = hits[0]
-            return {
-                "url": h["largeImageURL"],
-                "thumbnail": h["webformatURL"],
-                "type": "image",
-                "license": "Pixabay License",
-                "attribution": f"Image by {h['user']} on Pixabay",
-                "source": "pixabay",
-            }
-    except Exception:
-        pass
-    return None
 
 
-async def _fetch_pixabay_video(query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
-    PIXABAY_KEY = ConfigManager.get_api_key("pixabay_api") or os.getenv("PIXABAY_API_KEY", "")
-    if not PIXABAY_KEY:
-        return None
-    try:
-        r = await client.get(
-            "https://pixabay.com/api/videos/",
-            params={
-                "key": PIXABAY_KEY,
-                "q": query,
-                "per_page": 3,
-                "safesearch": "true",
-            },
-            timeout=10,
-        )
-        hits = r.json().get("hits", [])
-        if hits:
-            v = hits[0]
-            # Pixabay provides several formats, we look for a good quality one
-            videos = v.get("videos", {})
-            best = videos.get("large") or videos.get("medium") or videos.get("small") or {}
-            return {
-                "url": best.get("url", ""),
-                "thumbnail": f"https://i.vimeocdn.com/video/{v.get('picture_id')}_640x360.jpg",
-                "type": "video",
-                "width": best.get("width", 0),
-                "height": best.get("height", 0),
-                "duration_seconds": v.get("duration", 0),
-                "license": "Pixabay License",
-                "attribution": f"Video by {v['user']} on Pixabay",
-                "source": "pixabay",
-            }
-    except Exception:
-        pass
-    return None
 
 
 PLACEHOLDER_MEDIA = {
@@ -208,33 +77,160 @@ PLACEHOLDER_VIDEO = {
 }
 
 
-async def _download_file(url: str, dest_path: str, client: httpx.AsyncClient, retries: int = 3) -> str | None:
-    for attempt in range(retries):
-        try:
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            async with client.stream("GET", url, follow_redirects=True, timeout=30) as response:
-                if response.status_code == 200:
-                    with open(dest_path, "wb") as f:
-                        async for chunk in response.aiter_bytes():
-                            f.write(chunk)
-                    return dest_path
-                else:
-                    print(f"[MediaAgent] Download attempt {attempt+1} failed with status {response.status_code}")
-        except Exception as e:
-            print(f"[MediaAgent] Download attempt {attempt+1} failed: {e}")
-        
-        if attempt < retries - 1:
-            import asyncio
-            await asyncio.sleep(1 * (attempt + 1)) # exponential-ish backoff
-            
-    return None
 
 
 class MediaAgent(BaseAgent):
     PHASE_NUM = 4
     PHASE_NAME = "Smart Media Selection"
 
-    async def _search_scene_media(self, idx, scene, total_scenes, client, video_format, video_style, media_balance, semaphore, pexels_key, query_cache):
+    async def _download_file(self, url: str, dest_path: str, client: httpx.AsyncClient, retries: int = 3) -> str | None:
+        for attempt in range(retries):
+            try:
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                async with client.stream("GET", url, follow_redirects=True, timeout=30) as response:
+                    if response.status_code == 200:
+                        with open(dest_path, "wb") as f:
+                            async for chunk in response.aiter_bytes():
+                                f.write(chunk)
+                        return dest_path
+                    else:
+                        print(f"[MediaAgent] Download attempt {attempt+1} failed with status {response.status_code}")
+            except Exception as e:
+                print(f"[MediaAgent] Download attempt {attempt+1} failed: {e}")
+            
+            if attempt < retries - 1:
+                await asyncio.sleep(1 * (attempt + 1)) # exponential-ish backoff
+                
+        return None
+
+    async def _fetch_pexels_photo(self, query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
+        if not self.pexels_key:
+            return None
+        try:
+            orientation = "portrait" if video_format == "9:16" else "landscape"
+            r = await client.get(
+                PEXELS_PHOTO_URL,
+                headers={"Authorization": self.pexels_key},
+                params={"query": query, "per_page": 1, "orientation": orientation},
+                timeout=10,
+            )
+            data = r.json()
+            photos = data.get("photos", [])
+            if photos:
+                p = photos[0]
+                return {
+                    "url": p["src"]["large2x"],
+                    "thumbnail": p["src"]["medium"],
+                    "type": "image",
+                    "width": p["width"],
+                    "height": p["height"],
+                    "license": "Pexels Free License",
+                    "attribution": f"Photo by {p['photographer']} on Pexels",
+                    "source": "pexels",
+                }
+        except Exception:
+            pass
+        return None
+
+    async def _fetch_pexels_video(self, query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
+        if not self.pexels_key:
+            return None
+        try:
+            orientation = "portrait" if video_format == "9:16" else "landscape"
+            r = await client.get(
+                PEXELS_VIDEO_URL,
+                headers={"Authorization": self.pexels_key},
+                params={"query": query, "per_page": 3, "orientation": orientation, "size": "large"},
+                timeout=10,
+            )
+            data = r.json()
+            videos = data.get("videos", [])
+            if videos:
+                v = videos[0]
+                files = v.get("video_files", [])
+                efficient_files = [f for f in files if f.get("width", 0) <= 1920]
+                best = sorted(efficient_files or files, key=lambda x: x.get("width", 0), reverse=True)[0]
+                
+                return {
+                    "url": best.get("link", ""),
+                    "thumbnail": v.get("image", ""),
+                    "type": "video",
+                    "width": best.get("width", 0),
+                    "height": best.get("height", 0),
+                    "duration_seconds": v.get("duration", 0),
+                    "license": "Pexels Free License",
+                    "attribution": f"Video by {v['user']['name']} on Pexels",
+                    "source": "pexels",
+                }
+        except Exception:
+            pass
+        return None
+
+    async def _fetch_pixabay_photo(self, query: str, client: httpx.AsyncClient) -> dict | None:
+        if not self.pixabay_key:
+            return None
+        try:
+            r = await client.get(
+                PIXABAY_URL,
+                params={
+                    "key": self.pixabay_key,
+                    "q": query,
+                    "image_type": "photo",
+                    "per_page": 3,
+                    "safesearch": "true",
+                },
+                timeout=10,
+            )
+            hits = r.json().get("hits", [])
+            if hits:
+                h = hits[0]
+                return {
+                    "url": h["largeImageURL"],
+                    "thumbnail": h["webformatURL"],
+                    "type": "image",
+                    "license": "Pixabay License",
+                    "attribution": f"Image by {h['user']} on Pixabay",
+                    "source": "pixabay",
+                }
+        except Exception:
+            pass
+        return None
+
+    async def _fetch_pixabay_video(self, query: str, client: httpx.AsyncClient, video_format: str = "16:9") -> dict | None:
+        if not self.pixabay_key:
+            return None
+        try:
+            r = await client.get(
+                "https://pixabay.com/api/videos/",
+                params={
+                    "key": self.pixabay_key,
+                    "q": query,
+                    "per_page": 3,
+                    "safesearch": "true",
+                },
+                timeout=10,
+            )
+            hits = r.json().get("hits", [])
+            if hits:
+                v = hits[0]
+                videos = v.get("videos", {})
+                best = videos.get("large") or videos.get("medium") or videos.get("small") or {}
+                return {
+                    "url": best.get("url", ""),
+                    "thumbnail": f"https://i.vimeocdn.com/video/{v.get('picture_id')}_640x360.jpg",
+                    "type": "video",
+                    "width": best.get("width", 0),
+                    "height": best.get("height", 0),
+                    "duration_seconds": v.get("duration", 0),
+                    "license": "Pixabay License",
+                    "attribution": f"Video by {v['user']} on Pixabay",
+                    "source": "pixabay",
+                }
+        except Exception:
+            pass
+        return None
+
+    async def _search_scene_media(self, idx, scene, total_scenes, client, video_format, video_style, media_balance, semaphore, query_cache):
         """Phase 1: Search for metadata without downloading."""
         async with semaphore:
             try:
@@ -252,12 +248,12 @@ class MediaAgent(BaseAgent):
                 # 1. ALWAYS Try Video First (Pexels -> Pixabay)
                 is_realistic = video_style.lower() == "realistic"
                 
-                if pexels_key:
-                    vid = await _fetch_pexels_video(query, client, video_format)
+                if self.pexels_key:
+                    vid = await self._fetch_pexels_video(query, client, video_format)
                     if vid: candidates.append(vid)
                 
                 if not candidates:
-                    vid = await _fetch_pixabay_video(query, client, video_format)
+                    vid = await self._fetch_pixabay_video(query, client, video_format)
                     if vid: candidates.append(vid)
 
                 # 2. If no video found, try images/AI ONLY IF style is NOT realistic
@@ -265,7 +261,7 @@ class MediaAgent(BaseAgent):
                     if is_realistic:
                         # Force another video search with a generic query
                         generic_query = "cinematic nature background"
-                        vid = await _fetch_pexels_video(generic_query, client, video_format)
+                        vid = await self._fetch_pexels_video(generic_query, client, video_format)
                         if vid: 
                             candidates.append(vid)
                         else:
@@ -330,7 +326,6 @@ class MediaAgent(BaseAgent):
             media_balance = 0.0
         
         # Pre-load Pexels Key to avoid concurrent file read issues
-        pexels_key = ConfigManager.get_api_key("pexels_api") or os.getenv("PEXELS_API_KEY", "")
 
         # Use a smaller semaphore for API searches
         search_semaphore = asyncio.Semaphore(3 if video_style == "realistic" else 5)
@@ -343,7 +338,7 @@ class MediaAgent(BaseAgent):
             # STEP 1: Search for all media in parallel (bounded by search_semaphore)
             search_tasks = []
             for idx, scene in enumerate(scenes, 1):
-                search_tasks.append(self._search_scene_media(idx, scene, len(scenes), client, video_format, video_style, media_balance, search_semaphore, pexels_key, query_cache))
+                search_tasks.append(self._search_scene_media(idx, scene, len(scenes), client, video_format, video_style, media_balance, search_semaphore, query_cache))
             
             search_results = await asyncio.gather(*search_tasks)
             
@@ -359,7 +354,7 @@ class MediaAgent(BaseAgent):
                 
                 async with download_semaphore:
                     try:
-                        saved_path = await _download_file(url, local_path, client)
+                        saved_path = await self._download_file(url, local_path, client)
                         res["scene"]["media"]["local_path"] = saved_path
                         res["media_info"]["local_path"] = saved_path
                     except Exception as de:
@@ -393,7 +388,7 @@ class MediaAgent(BaseAgent):
                 
                 # Try downloading this unique fallback
                 async with httpx.AsyncClient() as client:
-                    saved_path = await _download_file(fallback_url, local_path, client)
+                    saved_path = await self._download_file(fallback_url, local_path, client)
                     if saved_path:
                         media_list[i]["local_path"] = saved_path
                         enriched_scenes[i]["media"]["local_path"] = saved_path

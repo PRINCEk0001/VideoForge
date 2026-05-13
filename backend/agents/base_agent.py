@@ -25,26 +25,29 @@ class BaseAgent(ABC):
     PHASE_NUM: int = 0
     PHASE_NAME: str = "Base"
 
-    def __init__(self):
-        keys = ConfigManager.load_api_keys()
+    def __init__(self, request_keys: dict = None):
+        config_keys = ConfigManager.load_api_keys()
+        request_keys = request_keys or {}
         
-        self.gemini_key = (
-            keys.get("gemini_api")
-            or os.getenv("GEMINI_API_KEY")
-            or os.getenv("GOOGLE_API_KEY")
-            or ""
-        ).strip()
-        
-        self.groq_key = (
-            keys.get("groq_api")
-            or os.getenv("GROQ_API_KEY") 
-            or ""
-        ).strip()
+        # Helper to get key with priority: Request -> Config -> Env
+        def get_key(request_name, config_name, env_name):
+            return (request_keys.get(request_name) or config_keys.get(config_name) or os.getenv(env_name) or "").strip()
+
+        self.gemini_key = get_key("gemini_api", "gemini_api", "GEMINI_API_KEY")
+        if not self.gemini_key:
+            self.gemini_key = os.getenv("GOOGLE_API_KEY", "").strip()
+
+        self.groq_key = get_key("groq_api", "groq_api", "GROQ_API_KEY")
+        self.pexels_key = get_key("pexels_api", "pexels_api", "PEXELS_API_KEY")
+        self.pixabay_key = get_key("pixabay_api", "pixabay_api", "PIXABAY_API_KEY")
+        self.elevenlabs_key = get_key("elevenlabs_api", "elevenlabs_api", "ELEVENLABS_API_KEY")
+        self.unreal_key = get_key("unreal_speech_api", "unreal_speech_api", "UNREAL_SPEECH_API_KEY")
         
         self.client = None
 
         if self.gemini_key and self.gemini_key not in PLACEHOLDER_KEYS:
-            self.client = genai.Client(api_key=self.gemini_key)
+            # Use AsyncClient for better performance in FastAPI
+            self.client = genai.Client(api_key=self.gemini_key, http_options={'api_version': 'v1alpha'})
 
     def _extract_json_text(self, raw_text: str) -> str:
         text = (raw_text or "").strip()
@@ -74,7 +77,7 @@ class BaseAgent(ABC):
         if not self.client:
             raise RuntimeError("Gemini key/client not available")
 
-        response = self.client.models.generate_content(
+        response = await self.client.aio.models.generate_content(
             model=MODEL,
             contents=full_prompt,
             config=types.GenerateContentConfig(
@@ -95,12 +98,11 @@ class BaseAgent(ABC):
             "response_format": {"type": "json_object"},
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {self.groq_key}"},
                 json=payload,
-                timeout=45.0,
             )
 
             # Some models reject response_format; retry once without it.
@@ -110,7 +112,6 @@ class BaseAgent(ABC):
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {self.groq_key}"},
                     json=payload,
-                    timeout=45.0,
                 )
 
             response.raise_for_status()

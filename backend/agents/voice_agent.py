@@ -93,55 +93,6 @@ async def _tts_edge(text: str, voice_id: str, speed: float = 1.0) -> bytes | Non
         print(f"[VoiceAgent] Edge-TTS error: {e}")
     return None
 
-async def _tts_elevenlabs(text: str, voice_id: str, client: httpx.AsyncClient) -> bytes | None:
-    """Premium ElevenLabs TTS."""
-    api_key = ConfigManager.get_api_key("elevenlabs_api") or os.getenv("ELEVENLABS_API_KEY")
-    if not api_key:
-        return None
-    try:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-        resp = await client.post(
-            url,
-            headers={"xi-api-key": api_key, "Content-Type": "application/json"},
-            json={
-                "text": text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
-            },
-            timeout=30
-        )
-        if resp.status_code == 200:
-            return resp.content
-        print(f"[VoiceAgent] ElevenLabs error: {resp.status_code} {resp.text}")
-    except Exception as e:
-        print(f"[VoiceAgent] ElevenLabs exception: {e}")
-    return None
-
-async def _tts_unreal(text: str, voice_id: str, client: httpx.AsyncClient) -> bytes | None:
-    """Fast Unreal Speech TTS."""
-    api_key = ConfigManager.get_api_key("unreal_speech_api") or os.getenv("UNREAL_SPEECH_API_KEY")
-    if not api_key:
-        return None
-    try:
-        url = "https://api.unrealspeech.com/stream"
-        resp = await client.post(
-            url,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "Text": text,
-                "VoiceId": voice_id,
-                "Bitrate": "192k",
-                "Speed": 0, # Unreal uses -1 to 1 for speed, we'll keep it default for now
-                "Pitch": 0
-            },
-            timeout=30
-        )
-        if resp.status_code == 200:
-            return resp.content
-    except Exception as e:
-        print(f"[VoiceAgent] Unreal Speech exception: {e}")
-    return None
-
 async def _tts_kokoro(text: str, voice_id: str) -> bytes | None:
     """Free local High-Quality Kokoro TTS."""
     try:
@@ -173,49 +124,6 @@ async def _tts_kokoro(text: str, voice_id: str) -> bytes | None:
         print(f"[VoiceAgent] Kokoro exception (ensure 'kokoro' and 'soundfile' are installed): {e}")
     return None
 
-async def _generate_audio(text: str, client: httpx.AsyncClient, config: dict) -> bytes:
-    """
-    Generate audio with multi-provider support and automatic fallbacks.
-    config: { "provider": "edge", "voice_id": "...", "speed": 1.05 }
-    """
-    provider = config.get("provider", "edge")
-    voice_id = config.get("voice_id")
-    speed = float(config.get("speed", 1.05))
-
-    # 1. Try selected provider (with 2 attempts)
-    data = None
-    for attempt in range(2):
-        try:
-            if provider == "eleven":
-                data = await _tts_elevenlabs(text, voice_id, client)
-            elif provider == "unreal":
-                data = await _tts_unreal(text, voice_id, client)
-            elif provider == "kokoro":
-                data = await _tts_kokoro(text, voice_id)
-            elif provider == "edge":
-                data = await _tts_edge(text, voice_id, speed)
-            
-            if data:
-                return data
-        except Exception as e:
-            print(f"[VoiceAgent] Attempt {attempt+1} failed for {provider}: {e}")
-        
-        if attempt == 0:
-            import asyncio
-            await asyncio.sleep(1) # Small pause before retry
-
-    if data:
-        return data
-
-    # 2. Fallback to Edge TTS (always free and reliable)
-    print(f"[VoiceAgent] Provider '{provider}' failed or unavailable. Falling back to Edge TTS...")
-    fallback_voice = "en-US-AvaNeural"
-    data = await _tts_edge(text, fallback_voice, speed)
-    
-    if data:
-        return data
-
-    raise RuntimeError("All TTS providers failed.")
 
 
 def _measure_duration(path: str) -> float:
@@ -244,6 +152,88 @@ class VoiceAgent(BaseAgent):
     PHASE_NUM  = 5
     PHASE_NAME = "Audio Generation"
 
+    async def _tts_elevenlabs(self, text: str, voice_id: str, client: httpx.AsyncClient) -> bytes | None:
+        """Premium ElevenLabs TTS."""
+        if not self.elevenlabs_key:
+            return None
+        try:
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            resp = await client.post(
+                url,
+                headers={"xi-api-key": self.elevenlabs_key, "Content-Type": "application/json"},
+                json={
+                    "text": text,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
+                },
+                timeout=30
+            )
+            if resp.status_code == 200:
+                return resp.content
+            print(f"[VoiceAgent] ElevenLabs error: {resp.status_code} {resp.text}")
+        except Exception as e:
+            print(f"[VoiceAgent] ElevenLabs exception: {e}")
+        return None
+
+    async def _tts_unreal(self, text: str, voice_id: str, client: httpx.AsyncClient) -> bytes | None:
+        """Fast Unreal Speech TTS."""
+        if not self.unreal_key:
+            return None
+        try:
+            url = "https://api.unrealspeech.com/stream"
+            resp = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {self.unreal_key}", "Content-Type": "application/json"},
+                json={
+                    "Text": text,
+                    "VoiceId": voice_id,
+                    "Bitrate": "192k",
+                    "Speed": 0, # Unreal uses -1 to 1 for speed
+                    "Pitch": 0
+                },
+                timeout=30
+            )
+            if resp.status_code == 200:
+                return resp.content
+            print(f"[VoiceAgent] Unreal Speech error: {resp.status_code} {resp.text}")
+        except Exception as e:
+            print(f"[VoiceAgent] Unreal Speech exception: {e}")
+        return None
+
+    async def _generate_audio(self, text: str, client: httpx.AsyncClient, config: dict) -> bytes:
+        """Generate audio with multi-provider support and automatic fallbacks."""
+        provider = config.get("provider", "edge")
+        voice_id = config.get("voice_id")
+        speed = float(config.get("speed", 1.05))
+
+        data = None
+        for attempt in range(2):
+            try:
+                if provider == "eleven":
+                    data = await self._tts_elevenlabs(text, voice_id, client)
+                elif provider == "unreal":
+                    data = await self._tts_unreal(text, voice_id, client)
+                elif provider == "kokoro":
+                    data = await _tts_kokoro(text, voice_id)
+                elif provider == "edge":
+                    data = await _tts_edge(text, voice_id, speed)
+                
+                if data:
+                    return data
+            except Exception as e:
+                print(f"[VoiceAgent] Attempt {attempt+1} failed for {provider}: {e}")
+            
+            if attempt == 0:
+                await asyncio.sleep(1)
+
+        # Final Fallback
+        fallback_voice = "en-US-AvaNeural"
+        data = await _tts_edge(text, fallback_voice, speed)
+        if data:
+            return data
+
+        raise RuntimeError("All TTS providers failed.")
+
     async def run(self, pipeline_json: dict) -> dict:
         scenes = pipeline_json.get("scenes", [])
         os.makedirs(AUDIO_DIR, exist_ok=True)
@@ -267,7 +257,7 @@ class VoiceAgent(BaseAgent):
                 dest = os.path.join(AUDIO_DIR, f"scene_{idx}.mp3")
 
                 try:
-                    audio_bytes = await _generate_audio(narration, client, voice_config)
+                    audio_bytes = await self._generate_audio(narration, client, voice_config)
                     with open(dest, "wb") as f:
                         f.write(audio_bytes)
                     dur = _measure_duration(dest)

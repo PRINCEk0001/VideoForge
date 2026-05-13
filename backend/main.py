@@ -19,10 +19,18 @@ from sse_starlette.sse import EventSourceResponse
 from backend.orchestrator import run_pipeline
 from backend.utils.config_manager import ConfigManager
 
-# Ensure local model cache
-os.environ["HF_HOME"] = os.path.abspath("./downloads/models/hf_cache")
+# Ensure local model cache and storage directories
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STORAGE_DIRS = ["downloads/scenes", "downloads/audio", "downloads/synced", "output", "downloads/models/hf_cache"]
 
-app = FastAPI(title="VideoForge AI", version="2.0.2")
+for d in STORAGE_DIRS:
+    path = os.path.join(BASE_DIR, d)
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+
+os.environ["HF_HOME"] = os.path.join(BASE_DIR, "downloads/models/hf_cache")
+
+app = FastAPI(title="VideoForge AI", version="2.0.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,10 +56,28 @@ async def run_pipeline_endpoint(
     user_script: str = Query(default="", description="User-provided script"),
     media_balance: float = Query(default=0.5, ge=0.0, le=1.0, description="Balance between AI (0.0) and Stock (1.0)"),
     video_style: str = Query(default="realistic", description="Visual style (realistic, cartoon)"),
+    # Per-request API keys (BYOK)
+    gemini_key: str | None = Query(default=None),
+    groq_key: str | None = Query(default=None),
+    pexels_key: str | None = Query(default=None),
+    pixabay_key: str | None = Query(default=None),
+    elevenlabs_key: str | None = Query(default=None),
+    unreal_key: str | None = Query(default=None),
 ):
     """
     Stream pipeline progress via Server-Sent Events.
     """
+    request_keys = {
+        "gemini_api": gemini_key,
+        "groq_api": groq_key,
+        "pexels_api": pexels_key,
+        "pixabay_api": pixabay_key,
+        "elevenlabs_api": elevenlabs_key,
+        "unreal_speech_api": unreal_key
+    }
+    # Clean out None values
+    request_keys = {k: v for k, v in request_keys.items() if v}
+
     return EventSourceResponse(run_pipeline(
         topic_hint=topic_hint,
         target_scene_count=target_scene_count,
@@ -64,7 +90,8 @@ async def run_pipeline_endpoint(
         voice_speed=voice_speed,
         user_script=user_script,
         media_balance=media_balance,
-        video_style=video_style
+        video_style=video_style,
+        request_keys=request_keys
     ))
 
 # Shared HTTP client for efficiency
@@ -331,25 +358,24 @@ async def get_analytics():
 async def debug_paths():
     """Diagnostic endpoint to check filesystem on Render."""
     try:
-        base = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
-        frontend_path = os.path.join(base, "frontend")
+        frontend_path = os.path.join(BASE_DIR, "frontend")
         dist_path = os.path.join(frontend_path, "dist")
         
         return {
             "cwd": os.getcwd(),
-            "base_dir": base,
-            "base_exists": os.path.exists(base),
+            "base_dir": BASE_DIR,
+            "base_exists": os.path.exists(BASE_DIR),
             "frontend_exists": os.path.exists(frontend_path),
             "dist_exists": os.path.exists(dist_path),
             "dist_contents": os.listdir(dist_path) if os.path.exists(dist_path) else [],
-            "frontend_contents": os.listdir(frontend_path) if os.path.exists(frontend_path) else []
+            "frontend_contents": os.listdir(frontend_path) if os.path.exists(frontend_path) else [],
+            "env_port": os.getenv("PORT"),
+            "hf_home": os.getenv("HF_HOME")
         }
     except Exception as e:
         return {"error": str(e)}
 
 # ── Serve Frontend ────────────────────────────────────────────────────────────
-# Use absolute path relative to this file for reliability in Docker
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 FRONTEND_DIST = os.path.join(BASE_DIR, "frontend/dist")
 
 @app.get("/")
@@ -358,10 +384,15 @@ async def serve_index():
     index_path = os.path.join(FRONTEND_DIST, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"detail": f"Frontend index.html not found at {index_path}. Check if build succeeded."}
+    return {
+        "status": "Warning",
+        "detail": f"Frontend dist folder not found at {FRONTEND_DIST}",
+        "help": "Ensure 'npm run build' succeeded and the files are in the correct place."
+    }
 
 # Mount other static assets (CSS, JS, images)
+# Note: StaticFiles should be mounted AFTER other routes
 if os.path.exists(FRONTEND_DIST):
-    app.mount("/", StaticFiles(directory=FRONTEND_DIST), name="frontend")
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
 else:
     print(f"[Warning] Frontend dist directory not found at {FRONTEND_DIST}")

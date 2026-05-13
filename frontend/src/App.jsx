@@ -114,12 +114,27 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const esRef = useRef(null);
 
-  // Load masked keys on mount
+  // Health check and load masked keys on mount
   useEffect(() => {
+    // 1. Load keys
     fetch("/api/config/keys")
       .then(r => r.json())
       .then(data => setUserKeys(prev => ({ ...prev, ...data })))
       .catch(err => console.error("Failed to load keys:", err));
+
+    // 2. Health check to verify backend
+    fetch("/api/health")
+      .then(r => r.json())
+      .then(data => {
+        if (data.status !== "OK") {
+           setErrorMsg("Backend is responding but reported an issue.");
+           setState("error");
+        }
+      })
+      .catch(err => {
+        setErrorMsg("Cannot connect to backend. Please wait a moment for the server to wake up or check your deployment.");
+        setState("error");
+      });
   }, []);
 
   // Fetch projects when view changes
@@ -210,8 +225,9 @@ export default function App() {
       es.close();
     });
 
-    es.onerror = () => {
-      setErrorMsg("Connection lost — make sure the backend is running.");
+    es.onerror = (err) => {
+      console.error("SSE Error:", err);
+      setErrorMsg("Connection lost — the backend might be restarting or taking too long. Check Render logs for details.");
       setState("error");
       es.close();
     };
