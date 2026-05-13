@@ -364,6 +364,24 @@ export default function App() {
                 </div>
               )}
 
+              <div style={{ marginTop: '8px' }}>
+                <div className="field-label">Target Duration: <span className="serif" style={{ fontSize: '18px', textTransform: 'none', color: 'var(--text-main)' }}>{targetDuration === 0 ? "Auto" : `${targetDuration} min`}</span></div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="11" 
+                  step="1" 
+                  value={targetDuration} 
+                  onChange={e => setTargetDuration(parseInt(e.target.value))} 
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  <span>Auto</span>
+                  <span>1m</span>
+                  <span>5m</span>
+                  <span>11m</span>
+                </div>
+              </div>
+
               <button 
                 className="btn-generate" 
                 onClick={() => setCurrentStep(2)}
