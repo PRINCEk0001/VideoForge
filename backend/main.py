@@ -22,7 +22,7 @@ from backend.utils.config_manager import ConfigManager
 # Ensure local model cache
 os.environ["HF_HOME"] = os.path.abspath("./downloads/models/hf_cache")
 
-app = FastAPI(title="VideoForge AI", version="2.0.1")
+app = FastAPI(title="VideoForge AI", version="2.0.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -272,7 +272,7 @@ async def get_analytics():
     """Calculate aggregate stats from all projects."""
     output_dir = "output"
     if not os.path.exists(output_dir):
-        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0}
+        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0, "history": []}
     
     projects = []
     for f in os.listdir(output_dir):
@@ -283,7 +283,7 @@ async def get_analytics():
             except: pass
             
     if not projects:
-        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0}
+        return {"total_videos": 0, "avg_retention": "0%", "avg_seo": 0, "total_duration_mins": 0, "history": []}
     
     total_videos = len(projects)
     total_seo = sum(p.get("seo_score", 0) for p in projects)
