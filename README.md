@@ -121,6 +121,27 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## 🚀 Deployment
+
+### Recommended: Docker (Railway, Render, VPS)
+The project includes a `Dockerfile` that automatically handles the installation of FFmpeg and all Python dependencies.
+
+1.  **Build the image**:
+    ```bash
+    docker build -t videoforge .
+    ```
+2.  **Run the container**:
+    ```bash
+    docker run -p 8001:8001 --env-file .env videoforge
+    ```
+
+### Manual Deployment (Ubuntu/Debian)
+If deploying manually on a VPS:
+1.  Install FFmpeg: `sudo apt update && sudo apt install ffmpeg`
+2.  Install Python deps: `pip install -r requirements.txt`
+3.  Run Backend: `uvicorn backend.main:app --host 0.0.0.0 --port 8001`
+4.  Deploy Frontend: Use Vercel or Netlify for the `frontend/` directory (point proxy to your backend URL).
+
 ---
 
 *Built with ❤️ by the VideoForge Team*
