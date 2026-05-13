@@ -657,7 +657,7 @@ export default function App() {
           <div className="section-card" style={{ marginTop: '20px' }}>
             <div className="section-title">📈 SEO Trend (Last 7 Videos)</div>
             <div style={{ height: '200px', width: '100%', background: 'var(--bg-glass)', borderRadius: '12px', display: 'flex', alignItems: 'flex-end', gap: '8px', padding: '20px' }}>
-              {stats.history.length > 0 ? stats.history.map((h, i) => (
+              {(stats.history || []).length > 0 ? (stats.history || []).map((h, i) => (
                 <div key={i} style={{ flex: 1, height: `${h}%`, background: 'var(--grad-main)', borderRadius: '4px 4px 0 0', opacity: 0.7, transition: 'height 1s ease' }} />
               )) : (
                 <div style={{ color: 'var(--text-dim)', margin: 'auto' }}>No data available yet.</div>
