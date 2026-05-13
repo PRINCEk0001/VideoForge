@@ -343,7 +343,6 @@ export default function App() {
 
               <button 
                 className="btn-generate" 
-                style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}
                 onClick={() => setCurrentStep(2)}
                 disabled={scriptSource === 'ai' ? !topic.trim() : !userScript.trim()}
               >
