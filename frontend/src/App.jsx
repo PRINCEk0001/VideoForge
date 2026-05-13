@@ -135,6 +135,16 @@ export default function App() {
   const handleGenerate = async () => {
     if (state === "running") return;
 
+    // API Key Validation
+    const hasLLM = userKeys.gemini_api || userKeys.groq_api;
+    const hasMedia = userKeys.pexels_api || userKeys.pixabay_api;
+    
+    if (!hasLLM || !hasMedia) {
+      alert("⚠️ Required API keys are missing! Please add Gemini/Groq and Pexels/Pixabay keys in Settings first.");
+      setIsSettingsOpen(true);
+      return;
+    }
+
     setState("running");
     setErrorMsg("");
     setFinalData(null);
@@ -272,6 +282,19 @@ export default function App() {
       {/* ── GENERATOR VIEW ──────────────────────────────────── */}
       {activeView === "generator" && (
         <>
+      
+      {/* API Key Warning Banner */}
+      {(!(userKeys.gemini_api || userKeys.groq_api) || !(userKeys.pexels_api || userKeys.pixabay_api)) && state === "idle" && (
+        <div className="section-card" style={{ border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)', marginBottom: '32px', cursor: 'pointer' }} onClick={() => setIsSettingsOpen(true)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '24px' }}>⚠️</span>
+            <div>
+              <div style={{ color: '#fca5a5', fontWeight: '700', fontSize: '15px' }}>Action Required: Missing API Keys</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>Add your Gemini/Groq and Pexels/Pixabay keys in <span style={{ textDecoration: 'underline', color: 'var(--text-main)' }}>Settings</span> to enable video generation.</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       {state === "idle" && (
