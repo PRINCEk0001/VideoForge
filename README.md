@@ -91,7 +91,7 @@ npm install
 **Start Backend:**
 ```bash
 # From the root directory
-uvicorn backend.main:app --reload --port 8000
+uvicorn backend.main:app --reload --port 8001
 ```
 
 **Start Frontend:**
