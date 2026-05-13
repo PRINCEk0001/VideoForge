@@ -92,7 +92,12 @@ async def voice_preview(
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "version": "2.0.0"}
+    from datetime import datetime
+    return {
+        "status": "OK",
+        "message": "Your API is running",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
 
 @app.get("/api/check_voice")
 async def check_voice_api(provider: str = Query("unreal")):
