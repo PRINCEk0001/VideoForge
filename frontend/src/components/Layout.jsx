@@ -8,9 +8,8 @@ const Layout = ({ children, onSettingsClick, activeView, onViewChange }) => {
       {/* Global Navigation Bar */}
       <nav className="nav-global">
         <div className="logo-group" onClick={() => onViewChange('generator')} style={{ cursor: 'pointer' }}>
-          <div className="logo-icon">🎬</div>
           <span className="logo-text">
-            Video<span>Forge</span>
+            Video<span className="serif">Forge</span>
           </span>
         </div>
         
@@ -18,7 +17,7 @@ const Layout = ({ children, onSettingsClick, activeView, onViewChange }) => {
         
         <div className="nav-actions">
           <button className="nav-link-btn" onClick={onSettingsClick}>
-            <span style={{ marginRight: '8px' }}>⚙️</span> API Settings
+            API Settings
           </button>
           <div className="user-avatar" />
         </div>
@@ -37,25 +36,25 @@ const Layout = ({ children, onSettingsClick, activeView, onViewChange }) => {
               className={`sidebar-item ${activeView === 'generator' ? 'active' : ''}`}
               onClick={() => { onViewChange('generator'); setSidebarOpen(false); }}
             >
-              <span className="sidebar-icon">🛠</span> Generator
+              Generator
             </button>
             <button 
               className={`sidebar-item ${activeView === 'videos' ? 'active' : ''}`}
               onClick={() => { onViewChange('videos'); setSidebarOpen(false); }}
             >
-              <span className="sidebar-icon">📂</span> My Videos
+              My Videos
             </button>
             <button 
               className={`sidebar-item ${activeView === 'analytics' ? 'active' : ''}`}
               onClick={() => { onViewChange('analytics'); setSidebarOpen(false); }}
             >
-              <span className="sidebar-icon">📈</span> Analytics
+              Analytics
             </button>
           </div>
 
           <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
             <button className="sidebar-item secondary" onClick={onSettingsClick}>
-              <span className="sidebar-icon">⚙️</span> Settings
+              Settings
             </button>
           </div>
         </aside>

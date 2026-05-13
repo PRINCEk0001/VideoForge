@@ -277,10 +277,10 @@ export default function App() {
       {state === "idle" && (
         <section className="hero">
           <h1 className="float">
-            Generate a full<br />
-            <span className="grad">AI-powered video</span>
+            Elevate your content with<br />
+            <span className="serif">AI-powered video</span>
           </h1>
-          <p>Create high-retention, professional videos in minutes—not hours. Let our 16-agent autonomous pipeline handle everything from script to assembly.</p>
+          <p>Create high-retention, professional videos in minutes. Let our 16-agent autonomous pipeline handle everything from script to final assembly.</p>
           
           <div className="trust-bar">
             <span className="trust-logo">YOUTUBE</span>
@@ -307,8 +307,7 @@ export default function App() {
           {currentStep === 1 && (
             <div className="section-card">
               <div className="section-title">
-                <span className="section-title-icon">✍️</span>
-                Script & Content
+                Step 01 <span className="serif">Script & Content</span>
               </div>
               <div>
                 <div className="field-label">Content Source</div>
@@ -357,8 +356,7 @@ export default function App() {
           {currentStep === 2 && (
             <div className="section-card">
               <div className="section-title">
-                <span className="section-title-icon">🎙️</span>
-                Step 2: Audio & Visual Assets
+                Step 02 <span className="serif">Audio & Visual Assets</span>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
