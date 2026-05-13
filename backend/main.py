@@ -67,6 +67,9 @@ async def run_pipeline_endpoint(
         video_style=video_style
     ))
 
+# Shared HTTP client for efficiency
+_shared_client = httpx.AsyncClient(timeout=30)
+
 @app.get("/api/voice_preview")
 async def voice_preview(
     text: str = Query(default="Hello, this is a sample of my voice. Do you like it?", description="Text to speak"),
@@ -76,18 +79,37 @@ async def voice_preview(
 ):
     """
     Generate a short audio preview for a specific voice.
+    Uses StreamingResponse for instant playback.
     """
-    from backend.agents.voice_agent import _generate_audio
+    from backend.agents.voice_agent import _tts_edge, _tts_elevenlabs, _tts_unreal, _tts_kokoro
+    from fastapi.responses import StreamingResponse
     import io
-    from fastapi.responses import Response
 
-    async with httpx.AsyncClient() as client:
-        try:
-            config = {"provider": provider, "voice_id": voice_id, "speed": speed}
-            audio_bytes = await _generate_audio(text, client, config)
-            return Response(content=audio_bytes, media_type="audio/mpeg")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    try:
+        config = {"provider": provider, "voice_id": voice_id, "speed": speed}
+        
+        # For Edge TTS, we can stream directly
+        if provider == "edge":
+            import edge_tts
+            rate_val = int((speed - 1.0) * 100)
+            rate_str = f"{rate_val:+}%" if rate_val != 0 else "+0%"
+            communicate = edge_tts.Communicate(text, voice_id, rate=rate_str)
+            
+            async def edge_generator():
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        yield chunk["data"]
+            
+            return StreamingResponse(edge_generator(), media_type="audio/mpeg")
+
+        # For others, we generate then stream
+        from backend.agents.voice_agent import _generate_audio
+        audio_bytes = await _generate_audio(text, _shared_client, config)
+        return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/mpeg")
+
+    except Exception as e:
+        print(f"[Preview Error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/health")
