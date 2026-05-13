@@ -30,6 +30,7 @@ input/
 *.jpg
 *.jpeg
 *.png
+!frontend/public/favicon.png
 *.gif
 
 # OS / IDE
