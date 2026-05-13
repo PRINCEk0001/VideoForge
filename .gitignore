@@ -12,6 +12,8 @@ __pycache__/
 .venv/
 env/
 venv/
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Node / Frontend
 node_modules/
@@ -20,24 +22,46 @@ frontend/dist/
 dist/
 dist-ssr/
 *.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
 
 # Pipeline Assets & Downloads
+# We ignore generated content but allow source public assets
 downloads/
 output/
 learning/
 input/
+temp/
 *.mp4
 *.mp3
 *.wav
 *.jpg
 *.jpeg
 *.png
-!frontend/public/favicon.png
 *.gif
+!frontend/public/favicon.png
+!frontend/public/robots.txt
+!frontend/public/sitemap.xml
 
 # OS / IDE
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 .antigravity/
