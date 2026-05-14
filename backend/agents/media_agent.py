@@ -327,10 +327,10 @@ class MediaAgent(BaseAgent):
         
         # Pre-load Pexels Key to avoid concurrent file read issues
 
-        # Use a smaller semaphore for API searches
-        search_semaphore = asyncio.Semaphore(3 if video_style == "realistic" else 5)
-        # Use a larger semaphore for actual downloads
-        download_semaphore = asyncio.Semaphore(10 if video_style == "realistic" else 15)
+        # Use a smaller semaphore for API searches to stay within 512MB RAM
+        search_semaphore = asyncio.Semaphore(2)
+        # Use a smaller semaphore for actual downloads to stay within 512MB RAM
+        download_semaphore = asyncio.Semaphore(3)
         
         query_cache = {}
         

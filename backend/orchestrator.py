@@ -114,6 +114,11 @@ async def run_pipeline(topic_hint: str = "", target_scene_count: int = 5,
                     }
                 ),
             }
+            # Clean up memory after each phase
+            del agent
+            import gc
+            gc.collect()
+            
             i += 1  # Move to next phase on success
 
         except Exception as exc:

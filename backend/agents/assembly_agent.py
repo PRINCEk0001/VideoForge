@@ -25,7 +25,7 @@ BG_MUSIC     = "downloads/music.mp3"  # Optional background music
 
 def _run(args: list) -> subprocess.CompletedProcess:
     """Run ffmpeg, raise RuntimeError on failure."""
-    cmd = [FFMPEG_BIN, "-y"] + args
+    cmd = [FFMPEG_BIN, "-y", "-threads", "1"] + args
     # print(f"[FFmpeg] {' '.join(str(x) for x in cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
