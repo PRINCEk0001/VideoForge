@@ -214,10 +214,7 @@ class VoiceAgent(BaseAgent):
                 elif provider == "unreal":
                     data = await self._tts_unreal(text, voice_id, client)
                 elif provider == "kokoro":
-                    # Kokoro uses too much RAM for Render free tier (512MB limit)
-                    # We disable it by default to prevent OOM
-                    print("[VoiceAgent] Kokoro skipped to save memory. Use Edge/ElevenLabs instead.")
-                    data = None
+                    data = await _tts_kokoro(text, voice_id)
                 elif provider == "edge":
                     data = await _tts_edge(text, voice_id, speed)
                 
