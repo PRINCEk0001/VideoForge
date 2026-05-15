@@ -17,11 +17,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
-from backend.orchestrator import run_pipeline
+from backend import orchestrator
 from backend.utils.config_manager import ConfigManager
 
 # Ensure local model cache and storage directories
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend/dist")
 STORAGE_DIRS = ["downloads/scenes", "downloads/audio", "downloads/synced", "output", "downloads/models/hf_cache"]
 
 for d in STORAGE_DIRS:
