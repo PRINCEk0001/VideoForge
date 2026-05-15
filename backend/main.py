@@ -10,7 +10,8 @@ Endpoints:
 import os
 import json
 import httpx
-from fastapi import FastAPI, Query, HTTPException
+import uuid
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -35,64 +36,79 @@ app = FastAPI(title="VideoForge AI", version="2.0.3")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-FINAL_VIDEO = "downloads/final_video.mp4"
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # This allows Hugging Face to display the app in their iframe
+    response.headers["Content-Security-Policy"] = "frame-ancestors https://*.huggingface.co https://huggingface.co"
+    return response
 
+# Temporary store for run configurations (BYOK security)
+run_store = {}
 
-@app.get("/api/run")
-async def run_pipeline_endpoint(
-    topic_hint: str = Query(default="", description="Optional topic hint"),
-    target_scene_count: int = Query(default=5, ge=1, le=100),
-    target_duration_minutes: float = Query(default=0, ge=0, le=20, description="Target video duration in minutes"),
-    video_format: str = Query(default="16:9", description="Video format (16:9 or 9:16)"),
-    voice_provider: str = Query(default="edge", description="Voice API provider (edge, eleven, unreal, kokoro)"),
-    voice_id: str = Query(default="en-US-AvaNeural", description="Specific Voice ID"),
-    voice_gender: str = Query(default="female", description="Voice gender (male, female)"),
-    voice_style: str = Query(default="normal", description="Voice style (normal, energetic)"),
-    voice_speed: float = Query(default=1.05, description="Voice speed rate"),
-    user_script: str = Query(default="", description="User-provided script"),
-    media_balance: float = Query(default=0.5, ge=0.0, le=1.0, description="Balance between AI (0.0) and Stock (1.0)"),
-    video_style: str = Query(default="realistic", description="Visual style (realistic, cartoon)"),
-    # Per-request API keys (BYOK)
-    gemini_key: str | None = Query(default=None),
-    groq_key: str | None = Query(default=None),
-    pexels_key: str | None = Query(default=None),
-    pixabay_key: str | None = Query(default=None),
-    elevenlabs_key: str | None = Query(default=None),
-    unreal_key: str | None = Query(default=None),
-):
-    """
-    Stream pipeline progress via Server-Sent Events.
-    """
+class RunConfig(BaseModel):
+    topic_hint: str = ""
+    target_scene_count: int = 5
+    target_duration_minutes: float = 0
+    video_format: str = "16:9"
+    voice_provider: str = "edge"
+    voice_id: str = ""
+    voice_speed: float = 1.05
+    user_script: str = ""
+    media_balance: float = 0.5
+    video_style: str = "realistic"
+    # Keys
+    gemini_key: str | None = None
+    groq_key: str | None = None
+    pexels_key: str | None = None
+    pixabay_key: str | None = None
+    elevenlabs_key: str | None = None
+    unreal_key: str | None = None
+
+@app.post("/api/run/init")
+async def init_run(config: RunConfig):
+    run_id = str(uuid.uuid4())
+    run_store[run_id] = config
+    return {"run_id": run_id}
+
+@app.get("/api/run/stream/{run_id}")
+async def run_pipeline_endpoint(run_id: str):
+    if run_id not in run_store:
+        raise HTTPException(status_code=404, detail="Run not initialized or expired")
+    
+    config = run_store.pop(run_id) # Use and remove for security
+    
     request_keys = {
-        "gemini_api": gemini_key,
-        "groq_api": groq_key,
-        "pexels_api": pexels_key,
-        "pixabay_api": pixabay_key,
-        "elevenlabs_api": elevenlabs_key,
-        "unreal_speech_api": unreal_key
+        "gemini_api": config.gemini_key,
+        "groq_api": config.groq_key,
+        "pexels_api": config.pexels_key,
+        "pixabay_api": config.pixabay_key,
+        "elevenlabs_api": config.elevenlabs_key,
+        "unreal_speech_api": config.unreal_key,
     }
-    # Clean out None values
-    request_keys = {k: v for k, v in request_keys.items() if v}
+    
+    return EventSourceResponse(
+        orchestrator.run_pipeline_iterative(
+            topic_hint=config.topic_hint,
+            target_scene_count=config.target_scene_count,
+            target_duration_minutes=config.target_duration_minutes,
+            video_format=config.video_format,
+            voice_provider=config.voice_provider,
+            voice_id=config.voice_id,
+            voice_speed=config.voice_speed,
+            user_script=config.user_script,
+            media_balance=config.media_balance,
+            video_style=config.video_style,
+            request_keys=request_keys
+        )
+    )
 
-    return EventSourceResponse(run_pipeline(
-        topic_hint=topic_hint,
-        target_scene_count=target_scene_count,
-        target_duration_minutes=target_duration_minutes,
-        video_format=video_format,
-        voice_provider=voice_provider,
-        voice_id=voice_id,
-        voice_gender=voice_gender,
-        voice_style=voice_style,
-        voice_speed=voice_speed,
-        user_script=user_script,
-        media_balance=media_balance,
-        video_style=video_style,
-        request_keys=request_keys
-    ))
+FINAL_VIDEO = "downloads/final_video.mp4"
 
 # Shared HTTP client for efficiency
 _shared_client = httpx.AsyncClient(timeout=30)
@@ -190,46 +206,59 @@ async def check_voice_api(provider: str = Query("unreal")):
     return {"ok": False, "message": f"Unknown provider {provider}"}
 
 
-@app.get("/api/config/verify")
-async def verify_key(provider: str, key: str):
-    """Verify a specific API key without saving it."""
-    provider = provider.lower()
-    async with httpx.AsyncClient() as client:
+class VerifyConfig(BaseModel):
+    provider: str
+    key: str
+
+@app.post("/api/config/verify")
+async def verify_key_endpoint(config: VerifyConfig):
+    """Verify an API key before saving it."""
+    provider = config.provider
+    key = config.key
+    
+    async with httpx.AsyncClient(timeout=10) as client:
         try:
             if provider == "gemini":
-                # Check by listing models (simplest way to verify key)
+                # Test with a simple request
                 url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
-                resp = await client.get(url, timeout=5)
+                resp = await client.get(url)
                 if resp.status_code == 200: return {"ok": True, "message": "Gemini key is valid!"}
                 return {"ok": False, "message": f"Gemini Error: {resp.json().get('error', {}).get('message', 'Invalid Key')}"}
             
-            elif provider == "groq":
+            if provider == "groq":
                 url = "https://api.groq.com/openai/v1/models"
-                resp = await client.get(url, headers={"Authorization": f"Bearer {key}"}, timeout=5)
+                resp = await client.get(url, headers={"Authorization": f"Bearer {key}"})
                 if resp.status_code == 200: return {"ok": True, "message": "Groq key is valid!"}
-                return {"ok": False, "message": "Groq key is invalid or expired."}
-            
-            elif provider == "pexels":
-                url = "https://api.pexels.com/v1/search?query=test&per_page=1"
-                resp = await client.get(url, headers={"Authorization": key}, timeout=5)
-                if resp.status_code == 200: return {"ok": True, "message": "Pexels key is valid!"}
-                return {"ok": False, "message": "Pexels key is invalid."}
-            
-            elif provider == "pixabay":
-                url = f"https://pixabay.com/api/?key={key}&q=test"
-                resp = await client.get(url, timeout=5)
-                if resp.status_code == 200: return {"ok": True, "message": "Pixabay key is valid!"}
-                return {"ok": False, "message": "Pixabay key is invalid."}
+                return {"ok": False, "message": "Invalid Groq Key"}
 
-            elif provider == "elevenlabs":
-                url = "https://api.elevenlabs.io/v1/models"
-                resp = await client.get(url, headers={"xi-api-key": key}, timeout=5)
+            if provider == "pexels":
+                url = "https://api.pexels.com/v1/search?query=test&per_page=1"
+                resp = await client.get(url, headers={"Authorization": key})
+                if resp.status_code == 200: return {"ok": True, "message": "Pexels key is valid!"}
+                return {"ok": False, "message": "Invalid Pexels Key"}
+
+            if provider == "pixabay":
+                url = f"https://pixabay.com/api/?key={key}&q=test"
+                resp = await client.get(url)
+                if resp.status_code == 200: return {"ok": True, "message": "Pixabay key is valid!"}
+                return {"ok": False, "message": "Invalid Pixabay Key"}
+
+            if provider == "elevenlabs":
+                url = "https://api.elevenlabs.io/v1/user"
+                resp = await client.get(url, headers={"xi-api-key": key})
                 if resp.status_code == 200: return {"ok": True, "message": "ElevenLabs key is valid!"}
-                return {"ok": False, "message": "ElevenLabs key is invalid."}
-                
+                return {"ok": False, "message": "Invalid ElevenLabs Key"}
+
+            if provider == "unreal":
+                # Unreal Speech doesn't have a simple profile endpoint, test with a small synth
+                url = "https://api.unrealspeech.com/stream"
+                resp = await client.post(url, headers={"Authorization": f"Bearer {key}"}, json={"Text": "t", "VoiceId": "Dan"})
+                if resp.status_code in [200, 400]: return {"ok": True, "message": "Unreal Speech key is valid!"} # 400 is fine if it reached the server
+                return {"ok": False, "message": "Invalid Unreal Speech Key"}
+
             return {"ok": False, "message": f"Verification not implemented for {provider}"}
         except Exception as e:
-            return {"ok": False, "message": f"Connection Error: {str(e)}"}
+            return {"ok": False, "message": f"Verification failed: {str(e)}"}
 
 class APIKeysModel(BaseModel):
     groq_api: str | None = None
@@ -376,23 +405,9 @@ async def debug_paths():
         return {"error": str(e)}
 
 # ── Serve Frontend ────────────────────────────────────────────────────────────
-FRONTEND_DIST = os.path.join(BASE_DIR, "frontend/dist")
-
-@app.get("/")
-async def serve_index():
-    """Serve the React app's index.html."""
-    index_path = os.path.join(FRONTEND_DIST, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {
-        "status": "Warning",
-        "detail": f"Frontend dist folder not found at {FRONTEND_DIST}",
-        "help": "Ensure 'npm run build' succeeded and the files are in the correct place."
-    }
-
-# Mount other static assets (CSS, JS, images)
-# Note: StaticFiles should be mounted AFTER other routes
+# This MUST be the last part of the file to avoid shadowing API routes.
 if os.path.exists(FRONTEND_DIST):
+    # This handles assets, favicon, and index.html (via html=True)
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
 else:
     print(f"[Warning] Frontend dist directory not found at {FRONTEND_DIST}")

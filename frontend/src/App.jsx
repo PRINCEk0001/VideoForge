@@ -188,49 +188,74 @@ export default function App() {
     setSteps(STEPS.map(s => ({ ...s, status: "pending" })));
     setCurrentStep(3);
 
-    const params = new URLSearchParams({
-      topic_hint: topic.trim(),
-      target_scene_count: sceneCount,
-      target_duration_minutes: targetDuration,
-      video_format: format,
-      voice_provider: voiceProvider,
-      voice_id: voiceId,
-      voice_speed: voiceSpeed,
-      user_script: scriptSource === "user" ? userScript.trim() : "",
-      media_balance: mediaBalance,
-      video_style: videoStyle,
-    });
-    const es = new EventSource(`/api/run?${params}`);
-    esRef.current = es;
+    try {
+      const config = {
+        topic_hint: topic.trim(),
+        target_scene_count: sceneCount,
+        target_duration_minutes: targetDuration,
+        video_format: format,
+        voice_provider: voiceProvider,
+        voice_id: voiceId,
+        voice_speed: voiceSpeed,
+        user_script: scriptSource === "user" ? userScript.trim() : "",
+        media_balance: mediaBalance,
+        video_style: videoStyle,
+        // Keys - send in body (secure)
+        gemini_key: userKeys.gemini_api || null,
+        groq_key: userKeys.groq_api || null,
+        pexels_key: userKeys.pexels_api || null,
+        pixabay_key: userKeys.pixabay_api || null,
+        elevenlabs_key: userKeys.elevenlabs_api || null,
+        unreal_key: userKeys.unreal_speech_api || null,
+      };
 
-    es.addEventListener("phase_update", (e) => {
-      const data = JSON.parse(e.data);
-      setSteps(prev =>
-        prev.map(s => s.id === data.phase ? { ...s, status: data.status } : s)
-      );
-    });
+      // 1. Initialize run (Secure POST)
+      const initResp = await fetch("/api/run/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      
+      if (!initResp.ok) throw new Error("Failed to initialize run");
+      const { run_id } = await initResp.json();
 
-    es.addEventListener("pipeline_complete", (e) => {
-      const data = JSON.parse(e.data);
-      setFinalData(data.final_output || data);
-      setState("done");
-      setCurrentStep(4);
-      es.close();
-    });
+      // 2. Open Stream (No keys in URL!)
+      const es = new EventSource(`/api/run/stream/${run_id}`);
+      esRef.current = es;
 
-    es.addEventListener("pipeline_failed", (e) => {
-      const data = JSON.parse(e.data);
-      setErrorMsg(`Phase ${data.phase} failed: ${data.reason}`);
+      es.addEventListener("phase_update", (e) => {
+        const data = JSON.parse(e.data);
+        setSteps(prev =>
+          prev.map(s => s.id === data.phase ? { ...s, status: data.status } : s)
+        );
+      });
+
+      es.addEventListener("pipeline_complete", (e) => {
+        const data = JSON.parse(e.data);
+        setFinalData(data.final_output || data);
+        setState("done");
+        setCurrentStep(4);
+        es.close();
+      });
+
+      es.addEventListener("pipeline_failed", (e) => {
+        const data = JSON.parse(e.data);
+        setErrorMsg(`Phase ${data.phase} failed: ${data.reason}`);
+        setState("error");
+        es.close();
+      });
+
+      es.onerror = (err) => {
+        console.error("SSE Error:", err);
+        setErrorMsg("Connection lost — the backend might be restarting or taking too long.");
+        setState("error");
+        es.close();
+      };
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to start generation.");
       setState("error");
-      es.close();
-    });
-
-    es.onerror = (err) => {
-      console.error("SSE Error:", err);
-      setErrorMsg("Connection lost — the backend might be restarting or taking too long. Check Render logs for details.");
-      setState("error");
-      es.close();
-    };
+    }
   };
 
   /* ── Play Voice Sample ──────────────────────────────────── */
@@ -278,7 +303,11 @@ export default function App() {
     if (!key || key.includes("...")) return; // Don't verify masked or empty
     setVerifyStatus(prev => ({ ...prev, [provider]: 'verifying' }));
     try {
-      const r = await fetch(`/api/config/verify?provider=${provider}&key=${key}`);
+      const r = await fetch("/api/config/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, key }),
+      });
       const data = await r.json();
       setVerifyStatus(prev => ({ ...prev, [provider]: data.ok ? 'success' : 'failed' }));
       if (!data.ok) alert(data.message);

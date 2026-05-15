@@ -1,3 +1,13 @@
+---
+title: VideoForge AI
+emoji: 🎬
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # VideoForge AI 🎬
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)

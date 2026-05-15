@@ -33,9 +33,9 @@ COPY --from=frontend-builder /frontend/dist ./frontend/dist
 # Create necessary directories for storage
 RUN mkdir -p downloads/scenes downloads/audio downloads/synced output downloads/models/hf_cache
 
-# Expose the port (Render will use this if PORT is not set)
-EXPOSE 8001
+# Expose the port (Hugging Face Spaces uses 7860 by default)
+EXPOSE 7860
 
 # Command to run the backend (which now also serves the frontend)
 # We use the shell form to allow environment variable expansion for PORT
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8001}
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860}
